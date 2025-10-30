@@ -1,8 +1,21 @@
+const router = express.Router();
+// Delete an expense by ID
+router.delete("/:expenseId", async (req, res) => {
+  try {
+    const { expenseId } = req.params;
+    const deleted = await Expense.findByIdAndDelete(expenseId);
+    if (!deleted) return res.status(404).json({ message: "Expense not found" });
+    res.json({ message: "Expense deleted", expense: deleted });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error deleting expense" });
+  }
+});
 import express from "express";
 import Expense from "../models/Expense.js";
 import Group from "../models/Group.js";
 
-const router = express.Router();
+
 
 // Add new expense
 router.post("/add", async (req, res) => {
@@ -48,6 +61,32 @@ router.post("/add", async (req, res) => {
   }
 });
 
+import { calculateBalances, calculateSettlements } from "./groupDetailsHelpers.js";
+
+// Calculate balances for a group (robust version, only endpoint needed)
+router.get("/balances/:groupId", async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const balances = await calculateBalances(groupId);
+    res.json(balances);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error calculating balances" });
+  }
+});
+
+// Calculate minimal settlements between group members
+router.get("/settlements/:groupId", async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const settlements = await calculateSettlements(groupId);
+    res.json(settlements);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Error calculating settlements" });
+  }
+});
+
 // Get all expenses for a group
 router.get("/:groupId", async (req, res) => {
   try {
@@ -59,97 +98,6 @@ router.get("/:groupId", async (req, res) => {
   }
 });
 
-// Calculate balances for a group (robust version, only endpoint needed)
-router.get("/balances/:groupId", async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const expenses = await Expense.find({ groupId });
-    if (expenses.length === 0) return res.json({});
-
-    const balance = {};
-
-    // collect all members from any expense
-    const allMembers = new Set(expenses.flatMap(e => e.membersInvolved));
-    allMembers.forEach(m => (balance[m] = 0));
-
-    // calculate balance per member
-    expenses.forEach(exp => {
-      const split = exp.amount / exp.membersInvolved.length;
-      exp.membersInvolved.forEach(m => {
-        if (m === exp.paidBy) {
-          balance[m] += exp.amount - split; // payer gets back others' shares
-        } else {
-          balance[m] -= split; // non-payers owe their share
-        }
-      });
-    });
-
-    res.json(balance);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error calculating balances" });
-  }
-});
-
-// Calculate minimal settlements between group members
-router.get("/settlements/:groupId", async (req, res) => {
-  try {
-    const { groupId } = req.params;
-    const expenses = await Expense.find({ groupId });
-    if (expenses.length === 0) return res.json([]);
-
-    // Compute net balance per user
-    const balance = {};
-    const allMembers = new Set(expenses.flatMap(e => e.membersInvolved));
-    allMembers.forEach(m => (balance[m] = 0));
-
-    expenses.forEach(exp => {
-      const split = exp.amount / exp.membersInvolved.length;
-      exp.membersInvolved.forEach(m => {
-        if (m === exp.paidBy) {
-          balance[m] += exp.amount - split;
-        } else {
-          balance[m] -= split;
-        }
-      });
-    });
-
-    // Split into creditors (owed money) and debtors (owe money)
-    const debtors = [];
-    const creditors = [];
-
-    Object.entries(balance).forEach(([member, amount]) => {
-      if (amount < -0.01) debtors.push({ member, amount: -amount }); // owes money
-      else if (amount > 0.01) creditors.push({ member, amount }); // is owed
-    });
-
-    // Simplify payments
-    const settlements = [];
-    let i = 0,
-      j = 0;
-
-    while (i < debtors.length && j < creditors.length) {
-      const payAmount = Math.min(debtors[i].amount, creditors[j].amount);
-
-      settlements.push({
-        from: debtors[i].member,
-        to: creditors[j].member,
-        amount: payAmount.toFixed(2),
-      });
-
-      debtors[i].amount -= payAmount;
-      creditors[j].amount -= payAmount;
-
-      if (Math.abs(debtors[i].amount) < 0.01) i++;
-      if (Math.abs(creditors[j].amount) < 0.01) j++;
-    }
-
-    res.json(settlements);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error calculating settlements" });
-  }
-});
 
 
 export default router;

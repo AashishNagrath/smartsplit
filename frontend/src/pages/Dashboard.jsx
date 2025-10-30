@@ -50,7 +50,8 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-  //Fetch expenses + balances for selected group
+
+  // Fetch expenses + balances for selected group
   const fetchExpenses = async (groupId) => {
     try {
       const res = await api.get(`/expenses/${groupId}`);
@@ -59,6 +60,19 @@ export default function Dashboard({ user, onLogout }) {
     } catch (err) {
       console.error(err);
       alert("Error fetching expenses or balances");
+    }
+  };
+
+  // Delete an expense
+  const handleDeleteExpense = async (expenseId) => {
+    if (!window.confirm("Delete this expense?")) return;
+    try {
+      await api.delete(`/expenses/${expenseId}`);
+      // Refresh expenses after delete
+      fetchExpenses(selectedGroup._id);
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting expense");
     }
   };
 
@@ -163,8 +177,39 @@ const fetchSettlements = async (groupId) => {
       {/* GROUP DETAILS */}
       {selectedGroup && (
         <section>
+
           <h2>Group: {selectedGroup.name}</h2>
           <p>Members: {selectedGroup.members.join(", ")}</p>
+
+          {/* Add Member to Group */}
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const email = e.target.elements.memberEmail.value.trim();
+              if (!email) return;
+              try {
+                await api.post(`/groups/${selectedGroup._id}/add-member`, { email });
+                alert("Member added!");
+                // Refresh group list and details
+                fetchGroups();
+                setSelectedGroup({ ...selectedGroup, members: [...selectedGroup.members, email.toLowerCase()] });
+                e.target.reset();
+              } catch (err) {
+                alert(
+                  err.response?.data?.message || "Error adding member"
+                );
+              }
+            }}
+            style={{ marginBottom: 16 }}
+          >
+            <input
+              name="memberEmail"
+              placeholder="Add member by email"
+              type="email"
+              required
+            />
+            <button type="submit">Add Member</button>
+          </form>
 
           <h3>Add Expense</h3>
           <form onSubmit={handleAddExpense}>
@@ -212,6 +257,12 @@ const fetchSettlements = async (groupId) => {
               {expenses.map((ex) => (
                 <li key={ex._id}>
                   {ex.description} — ₹{ex.amount} (paid by {ex.paidBy})
+                  <button
+                    style={{ marginLeft: 8, color: 'red' }}
+                    onClick={() => handleDeleteExpense(ex._id)}
+                  >
+                    Delete
+                  </button>
                 </li>
               ))}
             </ul>
