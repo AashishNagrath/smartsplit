@@ -91,4 +91,65 @@ router.get("/balances/:groupId", async (req, res) => {
   }
 });
 
+// Calculate minimal settlements between group members
+router.get("/settlements/:groupId", async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const expenses = await Expense.find({ groupId });
+    if (expenses.length === 0) return res.json([]);
+
+    // Compute net balance per user
+    const balance = {};
+    const allMembers = new Set(expenses.flatMap(e => e.membersInvolved));
+    allMembers.forEach(m => (balance[m] = 0));
+
+    expenses.forEach(exp => {
+      const split = exp.amount / exp.membersInvolved.length;
+      exp.membersInvolved.forEach(m => {
+        if (m === exp.paidBy) {
+          balance[m] += exp.amount - split;
+        } else {
+          balance[m] -= split;
+        }
+      });
+    });
+
+    // Split into creditors (owed money) and debtors (owe money)
+    const debtors = [];
+    const creditors = [];
+
+    Object.entries(balance).forEach(([member, amount]) => {
+      if (amount < -0.01) debtors.push({ member, amount: -amount }); // owes money
+      else if (amount > 0.01) creditors.push({ member, amount }); // is owed
+    });
+
+    // Simplify payments
+    const settlements = [];
+    let i = 0,
+      j = 0;
+
+    while (i < debtors.length && j < creditors.length) {
+      const payAmount = Math.min(debtors[i].amount, creditors[j].amount);
+
+      settlements.push({
+        from: debtors[i].member,
+        to: creditors[j].member,
+        amount: payAmount.toFixed(2),
+      });
+
+      debtors[i].amount -= payAmount;
+      creditors[j].amount -= payAmount;
+
+      if (Math.abs(debtors[i].amount) < 0.01) i++;
+      if (Math.abs(creditors[j].amount) < 0.01) j++;
+    }
+
+    res.json(settlements);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error calculating settlements" });
+  }
+});
+
+
 export default router;

@@ -6,6 +6,7 @@ export default function Dashboard({ user, onLogout }) {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [newGroup, setNewGroup] = useState({ name: "", members: "" });
   const [expenses, setExpenses] = useState([]);
+  const [settlements, setSettlements] = useState([]);
   const [expense, setExpense] = useState({
     description: "",
     amount: "",
@@ -13,7 +14,7 @@ export default function Dashboard({ user, onLogout }) {
   });
   const [balances, setBalances] = useState({});;
 
-  // ✅ Fetch all groups for logged-in user
+  // Fetch all groups for logged-in user
   const fetchGroups = async () => {
     try {
       const res = await api.get(`/groups/user/${user.email.toLowerCase()}`);
@@ -24,7 +25,7 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-  // ✅ Create new group
+  // Create new group
   const handleCreateGroup = async (e) => {
     e.preventDefault();
     try {
@@ -49,7 +50,7 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-  // ✅ Fetch expenses + balances for selected group
+  //Fetch expenses + balances for selected group
   const fetchExpenses = async (groupId) => {
     try {
       const res = await api.get(`/expenses/${groupId}`);
@@ -68,6 +69,16 @@ export default function Dashboard({ user, onLogout }) {
   } catch (err) {
     console.error(err);
     alert("Error fetching balances");
+  }
+};
+
+const fetchSettlements = async (groupId) => {
+  try {
+    const res = await api.get(`/expenses/settlements/${groupId}`);
+    setSettlements(res.data);
+  } catch (err) {
+    console.error(err);
+    alert("Error fetching settlements");
   }
 };
 
@@ -207,19 +218,32 @@ export default function Dashboard({ user, onLogout }) {
           )}
 
           <h3>Balances</h3>
-          {Object.keys(balances).length === 0 ? (
-            <p>No balances yet.</p>
-          ) : (
-            <ul>
-              {Object.entries(balances).map(([member, amount]) => (
-                <li key={member}>
-                  {member}: {amount > 0 ? `is owed ₹${amount.toFixed(2)}` : `owes ₹${Math.abs(amount).toFixed(2)}`}
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/* Group Balance Summary removed: balances is a flat object, not a summary object */}
+            {Object.keys(balances).length === 0 ? (
+              <p>No balances yet.</p>
+            ) : (
+              <ul>
+                {Object.entries(balances).map(([member, amount]) => (
+                  <li key={member}>
+                    {member}: {amount > 0 ? `is owed ₹${amount.toFixed(2)}` : `owes ₹${Math.abs(amount).toFixed(2)}`}
+                  </li>
+                ))}
+              </ul>
+            )}
+          <h3>Settlements</h3>
+            <button onClick={() => fetchSettlements(selectedGroup._id)}>
+              Simplify Debts
+            </button>
+            {settlements.length === 0 ? (
+              <p>No settlements yet.</p>
+            ) : (
+              <ul>
+                {settlements.map((s, i) => (
+                  <li key={i}>
+                    💸 {s.from} → {s.to}: ₹{s.amount}
+                  </li>
+                ))}
+              </ul>
+              )}
         </section>
       )}
     </div>
