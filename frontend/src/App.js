@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import LoginForm from "./components/LoginForm";
 import RegisterForm from "./components/RegistrationForm";
 import Dashboard from "./pages/Dashboard";
+import "./App.css";
 
 function App() {
   const [user, setUser] = useState(() => {
