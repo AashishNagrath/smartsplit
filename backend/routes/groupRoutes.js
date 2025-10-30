@@ -1,45 +1,41 @@
-
 import express from "express";
 import Group from "../models/Group.js";
-
 const router = express.Router();
 
-// GET /api/groups/mine?email=user@email.com - get groups for a user
-router.get("/mine", async (req, res) => {
+// Create new group
+router.post("/create", async (req, res) => {
   try {
-    const { email } = req.query;
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
+    let { name, members, createdBy } = req.body;
+    if (!name || !Array.isArray(members) || members.length === 0 || !createdBy)
+      return res.status(400).json({ message: "Missing required fields" });
+
+    // Normalize emails
+    members = members.map(e => e.trim().toLowerCase());
+    createdBy = createdBy.trim().toLowerCase();
+
+    if (!members.includes(createdBy)) members.push(createdBy);
+    if (members.length < 2)
+      return res.status(400).json({ message: "A group must have at least 2 members." });
+
+    const group = new Group({ name, members, createdBy });
+    await group.save();
+    res.json({ message: "Group created successfully", group });
+  } catch (err) {
+    console.error("Error details:", err);
+    if (err.name === "ValidationError") {
+      return res.status(400).json({ message: "Validation error", details: err.message });
     }
-    // Find groups where the user is a member (case-insensitive)
-    const groups = await Group.find({ members: { $elemMatch: { $regex: `^${email}$`, $options: "i" } } });
-    res.status(200).json(groups);
-  } catch (error) {
-    console.error("Error fetching user's groups:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error creating group", error: err.message });
   }
 });
-
-// POST /api/groups - create group
-router.post("/", async (req, res) => {
+// Get groups for a user
+router.get("/user/:email", async (req, res) => {
   try {
-    const { name, members } = req.body;
-    const group = await Group.create({ name, members });
-    res.status(201).json(group);
-  } catch (error) {
-    console.error("Error creating group:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-// GET /api/groups - get all groups
-router.get("/", async (req, res) => {
-  try {
-    const groups = await Group.find();
-    res.status(200).json(groups);
-  } catch (error) {
-    console.error("Error fetching groups:", error);
-    res.status(500).json({ message: "Server error" });
+    const groups = await Group.find({ members: req.params.email });
+    res.json(groups);
+  } catch (err) {
+    console.error("Error details:", err);
+    res.status(500).json({ message: "Error fetching groups" });
   }
 });
 

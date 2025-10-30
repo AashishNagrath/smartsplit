@@ -5,8 +5,8 @@ const expenseSchema = new mongoose.Schema({
   description: { type: String, required: true },
   amount: { type: Number, required: true },
   paidBy: { type: String, required: true },
-  splitBetween: [{ type: String, required: true }],
-}, { timestamps: true });
+  membersInvolved: [{ type: String, required: true }], // emails of members
+  createdAt: { type: Date, default: Date.now }
+});
 
-const Expense = mongoose.model("Expense", expenseSchema);
-export default Expense;
+export default mongoose.model("Expense", expenseSchema);
