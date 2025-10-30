@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 import { useState, useEffect } from "react";
 import api from "../api/api";
 
@@ -12,11 +11,12 @@ export default function Dashboard({ user, onLogout }) {
     amount: "",
     paidBy: "",
   });
+  const [balances, setBalances] = useState({});;
 
   // ✅ Fetch all groups for logged-in user
   const fetchGroups = async () => {
     try {
-  const res = await api.get(`/groups/user/${user.email.toLowerCase()}`);
+      const res = await api.get(`/groups/user/${user.email.toLowerCase()}`);
       setGroups(res.data);
     } catch (err) {
       console.error(err);
@@ -34,7 +34,7 @@ export default function Dashboard({ user, onLogout }) {
         .filter((m) => m);
       if (!members.includes(user.email)) members.push(user.email); // include creator
 
-      const res = await api.post("/groups/create", {
+      await api.post("/groups/create", {
         name: newGroup.name,
         members,
         createdBy: user.email,
@@ -49,18 +49,29 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-  // ✅ Fetch expenses for selected group
+  // ✅ Fetch expenses + balances for selected group
   const fetchExpenses = async (groupId) => {
     try {
       const res = await api.get(`/expenses/${groupId}`);
       setExpenses(res.data);
+      fetchBalances(groupId);
     } catch (err) {
       console.error(err);
-      alert("Error fetching expenses");
+      alert("Error fetching expenses or balances");
     }
   };
 
-  // ✅ Add new expense
+  const fetchBalances = async (groupId) => {
+  try {
+    const res = await api.get(`/expenses/balances/${groupId}`);
+    setBalances(res.data);
+  } catch (err) {
+    console.error(err);
+    alert("Error fetching balances");
+  }
+};
+
+  //  Add new expense
   const handleAddExpense = async (e) => {
     e.preventDefault();
     try {
@@ -122,7 +133,12 @@ export default function Dashboard({ user, onLogout }) {
           <ul>
             {groups.map((g) => (
               <li key={g._id}>
-                <button onClick={() => { setSelectedGroup(g); fetchExpenses(g._id); }}>
+                <button
+                  onClick={() => {
+                    setSelectedGroup(g);
+                    fetchExpenses(g._id);
+                  }}
+                >
                   {g.name}
                 </button>
               </li>
@@ -160,13 +176,15 @@ export default function Dashboard({ user, onLogout }) {
             />
             <select
               value={expense.paidBy}
-              onChange={e => setExpense({ ...expense, paidBy: e.target.value })}
+              onChange={(e) =>
+                setExpense({ ...expense, paidBy: e.target.value })
+              }
               required
             >
               <option value="" disabled>
                 Select payer
               </option>
-              {selectedGroup.members.map(member => (
+              {selectedGroup.members.map((member) => (
                 <option key={member} value={member}>
                   {member}
                 </option>
@@ -187,6 +205,21 @@ export default function Dashboard({ user, onLogout }) {
               ))}
             </ul>
           )}
+
+          <h3>Balances</h3>
+          {Object.keys(balances).length === 0 ? (
+            <p>No balances yet.</p>
+          ) : (
+            <ul>
+              {Object.entries(balances).map(([member, amount]) => (
+                <li key={member}>
+                  {member}: {amount > 0 ? `is owed ₹${amount.toFixed(2)}` : `owes ₹${Math.abs(amount).toFixed(2)}`}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* Group Balance Summary removed: balances is a flat object, not a summary object */}
         </section>
       )}
     </div>
